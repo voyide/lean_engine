@@ -1,0 +1,10 @@
+name = "lean_engine"
+version = "0.1.0"
+defaultTargets = ["LeanEngine"]
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
+[[lean_lib]]
+name = "LeanEngine"
