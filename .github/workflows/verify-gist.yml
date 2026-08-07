@@ -1,0 +1,52 @@
+name: Lean Verifier Webhook
+on:
+  workflow_dispatch:
+    inputs:
+      gist_id:
+        description: 'The ID of the Gist to verify'
+        required: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Elan
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Get Mathlib Cache
+        run: |
+          # No lake update here! This ensures it uses the cached manifest for 10s speed.
+          lake exe cache get
+
+      - name: Download Gist
+        run: |
+          gh gist clone ${{ github.event.inputs.gist_id }} gist_repo
+          # Safely copy the first .lean file found in the gist to overwrite the engine placeholder
+          LEAN_FILE=$(ls gist_repo/*.lean | head -n 1)
+          cp "$LEAN_FILE" ./LeanEngine.lean
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Proof and Capture Output
+        id: verify_step
+        run: |
+          # Run build and capture both stdout and stderr
+          if lake build > build_log.txt 2>&1; then
+            echo "STATUS=✅ SUCCESS" >> $GITHUB_ENV
+          else
+            echo "STATUS=❌ FAILURE" >> $GITHUB_ENV
+          fi
+          
+      - name: Comment on Gist
+        if: always()
+        run: |
+          LOG_CONTENT=$(cat build_log.txt)
+          # Formats a clean comment back to your Gist with raw Lean output
+          COMMENT_BODY="$STATUS"$'\n\n```text\n'"$LOG_CONTENT"$'\n```'
+          gh gist comment ${{ github.event.inputs.gist_id }} --body "$COMMENT_BODY"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
