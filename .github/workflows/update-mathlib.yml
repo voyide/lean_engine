@@ -1,0 +1,37 @@
+name: Weekly Mathlib Cache Renewal
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Midnight every Sunday
+  workflow_dispatch: 
+
+jobs:
+  update-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          
+      - name: Install Elan
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Update Lean and Mathlib
+        run: |
+          lake update
+          lake exe cache get
+
+      - name: Commit Updated Manifest
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          if git diff --exit-code lake-manifest.json lean-toolchain; then
+            echo "Mathlib is already up to date. No changes needed."
+          else
+            git add lake-manifest.json lean-toolchain
+            git commit -m "Auto-update Mathlib and Lean toolchain"
+            git push
+            echo "Successfully updated to the newest Mathlib."
+          fi
