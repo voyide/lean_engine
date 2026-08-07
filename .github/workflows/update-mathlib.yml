@@ -1,7 +1,7 @@
 name: Weekly Mathlib Cache Renewal
 on:
   schedule:
-    - cron: '0 0 * * 0' # Midnight every Sunday
+    - cron: '0 0 * * 0'
   workflow_dispatch: 
 
 jobs:
@@ -20,6 +20,9 @@ jobs:
       - name: Update Lean and Mathlib
         run: |
           lake update
+          # 🛠️ THE FIX: Dynamically copy Mathlib's toolchain to our project
+          cp .lake/packages/mathlib/lean-toolchain ./lean-toolchain
+          # Now download the cache
           lake exe cache get
 
       - name: Commit Updated Manifest
